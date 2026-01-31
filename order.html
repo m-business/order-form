@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Order Form</title>
+
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+(function(){
+  emailjs.init("ieBLo86Vc3H5DCVi7");
+})();
+</script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  background: url("https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3")
+    no-repeat center center fixed;
+  background-size: cover;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+video.bg-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -3;
+  opacity: 0.35;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 0, 30, 0.7);
+  z-index: -2;
+}
+
+.light {
+  position: fixed;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(180,80,255,0.35), transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+  transform: translate(-50%, -50%);
+}
+
+.box {
+  width: 360px;
+  padding: 28px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(200,150,255,0.4);
+  box-shadow: 0 0 50px rgba(180,90,255,0.8);
+  color: #ead7ff;
+}
+
+.notice {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #ffd84d;
+}
+
+.notice-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.notice ul {
+  margin: 0 0 0 18px;
+  padding: 0;
+}
+
+input, textarea {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+}
+
+textarea {
+  resize: none;
+  height: 90px;
+}
+
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, #7a1fff, #b266ff);
+}
+
+.warning {
+  color: #ff6b6b;
+  font-size: 14px;
+  margin-top: 10px;
+  text-align: center;
+  display: none;
+}
+
+.timer {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #ffd6ff;
+  text-align: center;
+}
+
+.success {
+  display: none;
+  text-align: center;
+}
+
+.success .check {
+  font-size: 64px;
+  color: #7dffb3;
+}
+</style>
+</head>
+
+<body>
+
+<video class="bg-video" autoplay muted loop playsinline>
+  <source src="https://cdn.coverr.co/videos/coverr-galaxy-spiral-5170/1080p.mp4">
+</video>
+
+<div class="overlay"></div>
+<div class="light" id="light"></div>
+
+<form id="orderForm" class="box">
+  <h2 style="text-align:center;">Place Your Order</h2>
+
+  <div class="notice">
+    <div class="notice-title">Notices</div>
+    <ul>
+      <li>Please use full sentences</li>
+      <li>There are no refunds</li>
+      <li>Each item has a €0.50 delivery cost</li>
+    </ul>
+  </div>
+
+  <input id="name" type="text" placeholder="Your Name" required>
+  <input id="email" type="email" placeholder="Your Email" required>
+  <textarea id="order" placeholder="What are you ordering?" required></textarea>
+
+  <div class="warning" id="warning"></div>
+  <div class="timer" id="timer"></div>
+
+  <button type="submit">Send Order</button>
+</form>
+
+<div id="successMessage" class="box success">
+  <div class="check">✔</div>
+  <h2>Your order was successful</h2>
+  <p>Please check your email for more information</p>
+
+  <div class="timer" id="successTimer"></div>
+  <div class="warning" id="cooldownWarning"></div>
+
+  <button onclick="makeAnotherOrder()">Make another order</button>
+</div>
+
+<script>
+const form = document.getElementById("orderForm");
+const success = document.getElementById("successMessage");
+const warning = document.getElementById("warning");
+const cooldownWarning = document.getElementById("cooldownWarning");
+
+const timerForm = document.getElementById("timer");
+const timerSuccess = document.getElementById("successTimer");
+
+const nameInput = document.getElementById("name");
+const emailInput = document.getElementById("email");
+const orderInput = document.getElementById("order");
+
+const COOLDOWN = 10 * 60 * 1000;
+const MAX_WARNINGS = 3;
+
+function isJunk(text) {
+  if (text.length < 10) return true;
+  if (!text.includes(" ")) return true;
+  if (new Set(text.toLowerCase()).size <= 4) return true;
+  return false;
+}
+
+function updateTimer() {
+  const last = localStorage.getItem("lastOrderTime");
+  if (!last) {
+    timerForm.textContent = "";
+    timerSuccess.textContent = "";
+    return;
+  }
+
+  const remaining = COOLDOWN - (Date.now() - last);
+  if (remaining <= 0) {
+    timerForm.textContent = "";
+    timerSuccess.textContent = "";
+    localStorage.removeItem("cooldownAttempts");
+    return;
+  }
+
+  const m = Math.floor(remaining / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+
+  const text = `You can make another order in ${m}:${s
+    .toString()
+    .padStart(2, "0")}`;
+
+  timerForm.textContent = text;
+  timerSuccess.textContent = text;
+}
+
+form.addEventListener("submit", function(e) {
+  e.preventDefault();
+
+  const now = Date.now();
+  const last = localStorage.getItem("lastOrderTime");
+
+  if (last && now - last < COOLDOWN) {
+    let attempts = parseInt(localStorage.getItem("cooldownAttempts") || "0", 10);
+    attempts++;
+    localStorage.setItem("cooldownAttempts", attempts);
+
+    warning.textContent =
+      attempts <= MAX_WARNINGS
+        ? `Please wait before ordering again. Warning ${attempts}/${MAX_WARNINGS}.`
+        : "⚠️ Strike warning: Repeated attempts may lead to suspension.";
+
+    warning.style.display = "block";
+    updateTimer();
+    return;
+  }
+
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  const message = orderInput.value.trim();
+
+  if (isJunk(message)) {
+    warning.textContent =
+      "Please write a proper order. Random or empty messages are not allowed.";
+    warning.style.display = "block";
+    return;
+  }
+
+  warning.style.display = "none";
+
+  emailjs.send(
+    "service_6pl1vkl",
+    "template_eazr43s",
+    { name, email, message }
+  ).then(() => {
+    localStorage.setItem("lastOrderTime", Date.now());
+    localStorage.removeItem("cooldownAttempts");
+
+    form.style.display = "none";
+    success.style.display = "block";
+    updateTimer();
+  }).catch(() => {
+    warning.textContent = "Email failed to send. Please try again.";
+    warning.style.display = "block";
+  });
+});
+
+function makeAnotherOrder() {
+  const last = localStorage.getItem("lastOrderTime");
+  if (last && Date.now() - last < COOLDOWN) {
+    cooldownWarning.textContent =
+      "Please wait until the timer ends before ordering again.";
+    cooldownWarning.style.display = "block";
+    updateTimer();
+    return;
+  }
+
+  cooldownWarning.style.display = "none";
+  success.style.display = "none";
+  form.style.display = "block";
+  warning.style.display = "none";
+  form.reset();
+}
+
+setInterval(updateTimer, 1000);
+updateTimer();
+
+document.addEventListener("mousemove", e => {
+  const light = document.getElementById("light");
+  light.style.left = e.clientX + "px";
+  light.style.top = e.clientY + "px";
+});
+</script>
+
+</body>
+</html>
+
